@@ -1,0 +1,206 @@
+/* ==========================================================================
+   TabView Styles - ChatGPT-like AI Interface
+   ========================================================================== */
+
+.tab-view-container {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  width: 100vw;
+  background-color: var(--ghost-screen-bg);
+  color: var(--ghost-text);
+  box-sizing: border-box;
+  overflow: hidden;
+  position: relative;
+  font-family: Inter, Avenir, Helvetica, Arial, sans-serif;
+}
+
+/* Header styling */
+.tab-view-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 24px;
+  border-bottom: 1px solid var(--ghost-border-light);
+  background: var(--ghost-screen-bg);
+  z-index: 10;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.tab-view-header-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 700;
+  font-size: 1.15rem;
+  letter-spacing: -0.01em;
+}
+
+.tab-view-header-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+/* Main chat container */
+.tab-view-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  align-items: center;
+  padding: 24px 16px;
+  overflow: hidden;
+  max-width: 900px;
+  margin: 0 auto;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* Hero Section (when chat is empty) */
+.tab-view-hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  text-align: center;
+  gap: 16px;
+  padding: 20px;
+}
+
+.tab-view-hero-icon {
+  width: 64px;
+  height: 64px;
+  border-radius: 20px;
+  background: var(--ghost-gradient);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  box-shadow: var(--ghost-shadow-large);
+  margin-bottom: 8px;
+}
+
+.tab-view-hero-title {
+  font-size: 2.2rem;
+  font-weight: 800;
+  background: var(--ghost-gradient);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  margin: 0;
+}
+
+.tab-view-hero-subtitle {
+  color: var(--ghost-subtext);
+  font-size: 1rem;
+  max-width: 480px;
+  line-height: 1.6;
+  margin: 0;
+}
+
+/* Back button bar (in conversation view) */
+.tab-view-back-bar {
+  width: 100%;
+  display: flex;
+  justify-content: flex-start;
+  align-items: center;
+  padding: 0 0 8px 4px;
+}
+
+/* Messages area */
+.tab-view-messages {
+  flex: 1;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  overflow-y: auto;
+  padding: 12px 8px 24px 8px;
+  scroll-behavior: smooth;
+}
+
+.chat-message {
+  display: flex;
+  gap: 12px;
+  max-width: 82%;
+  align-items: flex-start;
+}
+
+.chat-message.user {
+  align-self: flex-end;
+  flex-direction: row-reverse;
+}
+
+.chat-message.ai {
+  align-self: flex-start;
+}
+
+.chat-avatar {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  font-weight: 700;
+  font-size: 0.85rem;
+}
+
+.chat-message.user .chat-avatar {
+  background: var(--ghost-border);
+  color: var(--ghost-bg);
+}
+
+.chat-message.ai .chat-avatar {
+  background: var(--ghost-gradient);
+  color: #ffffff;
+}
+
+.chat-bubble {
+  padding: 14px 20px;
+  border-radius: 20px;
+  font-size: 0.95rem;
+  line-height: 1.6;
+  word-break: break-word;
+}
+
+.chat-message.user .chat-bubble {
+  background: var(--ghost-border);
+  color: var(--ghost-bg);
+  border-bottom-right-radius: 4px;
+  box-shadow: var(--ghost-shadow);
+}
+
+.chat-message.ai .chat-bubble {
+  background: transparent;
+  color: var(--ghost-text);
+  border: none;
+  box-shadow: none;
+  padding: 8px 12px;
+}
+
+/* Input area - Centered at bottom */
+.tab-view-input-section {
+  width: 100%;
+  max-width: 768px;
+  padding: 12px 0 8px 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.tab-view-input-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+}
+
+.tab-view-disclaimer {
+  font-size: 0.75rem;
+  color: var(--ghost-subtext);
+  text-align: center;
+}

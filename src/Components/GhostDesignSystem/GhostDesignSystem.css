@@ -1,0 +1,101 @@
+/* ==========================================================================
+   GhostDesignSystem Custom Properties / CSS Variables
+   ========================================================================== */
+:root,
+[data-theme="light"] {
+  --ghost-bg: #D4CFBF;
+  --ghost-screen-bg: #E9E5D8;
+  --ghost-border: #232b69;
+  --ghost-text: #232b69;
+  --ghost-subtext: rgba(35, 43, 105, 0.6);
+  --ghost-hover-bg: rgba(35, 43, 105, 0.08);
+  --ghost-gradient: linear-gradient(135deg, #6e8efb 0%, #a777e3 100%);
+  --ghost-gradient-start: #6e8efb;
+  --ghost-gradient-end: #a777e3;
+  --ghost-shadow: 0 6px 15px rgba(0, 0, 0, 0.1);
+  --ghost-shadow-large: 0 20px 40px rgba(0, 0, 0, 0.2);
+  --ghost-shadow-toast: 0 10px 30px rgba(0, 0, 0, 0.15);
+  --ghost-shadow-input: 0 2px 6px rgba(0, 0, 0, 0.05);
+  --ghost-shadow-input-focus: 0 4px 12px rgba(0, 0, 0, 0.08);
+  --ghost-slider-drag-shadow: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.3));
+  --ghost-slider-hover-shadow: drop-shadow(0 6px 12px rgba(0, 0, 0, 0.25));
+  --ghost-slider-normal-shadow: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.15));
+  --ghost-glow: rgba(110, 142, 251, 0.4);
+  --ghost-placeholder: rgba(35, 43, 105, 0.4);
+  --ghost-toast-success: #3b82f6;
+  --ghost-toast-info: #8b5cf6;
+  --ghost-toast-border: rgba(35, 43, 105, 0.15);
+  --ghost-toast-bg: rgba(212, 207, 191, 0.75);
+  --ghost-toast-text: #232b69;
+  --ghost-border-light: rgba(35, 43, 105, 0.25);
+  --ghost-toggle-knob-shadow: 0 2px 6px rgba(0, 0, 0, 0.15), 0 1px 3px rgba(0, 0, 0, 0.1);
+  --ghost-toggle-shadow-off: inset 0 2px 6px rgba(0, 0, 0, 0.1);
+  --ghost-card-bg: #E3E2D8;
+  --ghost-card-border: 1px solid rgba(35, 43, 105, 0.08);
+  --ghost-list-item-bg: #E3E2D8;
+  --ghost-list-item-border: 1px solid rgba(35, 43, 105, 0.15);
+  --ghost-card-spine: linear-gradient(to right, rgba(0, 0, 0, 0.08) 0%, rgba(0, 0, 0, 0.02) 60%, rgba(255, 255, 255, 0.25) 85%, rgba(0, 0, 0, 0.06) 100%);
+  --ghost-card-edge-bg: rgba(0, 0, 0, 0.04);
+  --ghost-card-edge-border: 1px solid rgba(255, 255, 255, 0.2);
+  --ghost-card-title-shadow: 0 0 1px rgba(0, 0, 0, 0.05);
+  --ghost-menu-bg-hover: rgba(35, 43, 105, 0.1);
+  --ghost-tooltip-bg: rgba(212, 207, 191, 0.85);
+  --ghost-tooltip-border: rgba(35, 43, 105, 0.2);
+  --ghost-tooltip-text: #232b69;
+  --ghost-tooltip-glow: rgba(110, 142, 251, 0.3);
+  --ghost-book-bg: #E3E2D8;
+  --ghost-book-cover-bg: var(--ghost-book-bg);
+  --ghost-book-cover-border: rgba(35, 43, 105, 0.08);
+  --ghost-book-cover-shadow: 0 12px 30px rgba(31, 38, 135, 0.08), inset 1px 1px 0px rgba(255, 255, 255, 0.3), inset -1px -1px 0px rgba(0, 0, 0, 0.05);
+  --ghost-hover-highlight: #6e8efb;
+  --ghost-dialog-bg: #9ca3af;
+}
+
+[data-theme="dark"] {
+  --ghost-bg: #232b69;
+  --ghost-screen-bg: #101426;
+  --ghost-border: #D4CFBF;
+  --ghost-text: #D4CFBF;
+  --ghost-subtext: rgba(212, 207, 191, 0.6);
+  --ghost-hover-bg: rgba(212, 207, 191, 0.08);
+  --ghost-gradient: linear-gradient(135deg, #004aad 0%, #cb6ce6 100%);
+  --ghost-gradient-start: #004aad;
+  --ghost-gradient-end: #cb6ce6;
+  --ghost-shadow: 0 6px 15px rgba(0, 0, 0, 0.3);
+  --ghost-shadow-large: 0 20px 40px rgba(0, 0, 0, 0.5);
+  --ghost-shadow-toast: 0 10px 30px rgba(0, 0, 0, 0.4);
+  --ghost-shadow-input: 0 2px 6px rgba(0, 0, 0, 0.15);
+  --ghost-shadow-input-focus: 0 4px 12px rgba(0, 0, 0, 0.25);
+  --ghost-slider-drag-shadow: drop-shadow(0 1px 3px rgba(255, 255, 255, 0.3));
+  --ghost-slider-hover-shadow: drop-shadow(0 6px 12px rgba(255, 255, 255, 0.25));
+  --ghost-slider-normal-shadow: drop-shadow(0 2px 6px rgba(255, 255, 255, 0.15));
+  --ghost-glow: rgba(203, 108, 230, 0.4);
+  --ghost-placeholder: rgba(212, 207, 191, 0.4);
+  --ghost-toast-success: #4ade80;
+  --ghost-toast-info: #cb6ce6;
+  --ghost-toast-border: rgba(212, 207, 191, 0.15);
+  --ghost-toast-bg: rgba(16, 20, 38, 0.85);
+  --ghost-toast-text: #E9E5D8;
+  --ghost-border-light: rgba(212, 207, 191, 0.25);
+  --ghost-toggle-knob-shadow: 0 2px 6px rgba(255, 255, 255, 0.15), 0 1px 3px rgba(255, 255, 255, 0.1);
+  --ghost-toggle-shadow-off: inset 0 2px 6px rgba(255, 255, 255, 0.1);
+  --ghost-card-bg: #1C1E2E;
+  --ghost-card-border: 1px solid rgba(255, 255, 255, 0.08);
+  --ghost-list-item-bg: #1C1E2E;
+  --ghost-list-item-border: 1px solid rgba(212, 207, 191, 0.15);
+  --ghost-card-spine: linear-gradient(to right, rgba(0, 0, 0, 0.25) 0%, rgba(0, 0, 0, 0.05) 60%, rgba(255, 255, 255, 0.03) 85%, rgba(0, 0, 0, 0.15) 100%);
+  --ghost-card-edge-bg: rgba(0, 0, 0, 0.2);
+  --ghost-card-edge-border: 1px solid rgba(255, 255, 255, 0.04);
+  --ghost-card-title-shadow: 0 0 1px rgba(255, 255, 255, 0.1);
+  --ghost-menu-bg-hover: rgba(255, 255, 255, 0.1);
+  --ghost-tooltip-bg: rgba(26, 32, 60, 0.85);
+  --ghost-tooltip-border: rgba(212, 207, 191, 0.2);
+  --ghost-tooltip-text: #D4CFBF;
+  --ghost-tooltip-glow: rgba(203, 108, 230, 0.4);
+  --ghost-book-bg: #1C1E2E;
+  --ghost-book-cover-bg: var(--ghost-book-bg);
+  --ghost-book-cover-border: rgba(255, 255, 255, 0.08);
+  --ghost-book-cover-shadow: 0 12px 30px rgba(0, 0, 0, 0.3), inset 1px 1px 0px rgba(255, 255, 255, 0.05), inset -1px -1px 0px rgba(0, 0, 0, 0.2);
+  --ghost-hover-highlight: #cb6ce6;
+  --ghost-dialog-bg: #101426;
+}
