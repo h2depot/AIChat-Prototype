@@ -199,6 +199,35 @@
   width: 100%;
 }
 
+.tab-view-error {
+  box-sizing: border-box;
+  width: 100%;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 14px;
+  color: #fca5a5;
+  background: rgba(127, 29, 29, 0.22);
+  border: 1px solid rgba(248, 113, 113, 0.5);
+  border-radius: 10px;
+  font-size: 0.85rem;
+  line-height: 1.5;
+  word-break: break-word;
+}
+
+.tab-view-error button {
+  flex-shrink: 0;
+  padding: 0;
+  color: inherit;
+  background: transparent;
+  border: 0;
+  font: inherit;
+  font-size: 1.1rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
 .tab-view-disclaimer {
   font-size: 0.75rem;
   color: var(--ghost-subtext);

@@ -458,9 +458,9 @@ impl Block {
     }
 
     fn load(vb: VarBuilder, cfg: &Config) -> Result<Self> {
-        let span = tracing::span!(tracing::Level::TRACE, "block");
-        let attn = CausalSelfAttention::load(vb.pp("self_attn"), cfg)?;
-        let mlp = Mlp::load(vb.pp("mlp"), cfg)?;
+        let span = tracing::span!(tracing::Level::TRACE, "blk");
+        //let attn = CausalSelfAttention::load(vb.pp("self_attn"), cfg)?;
+        //let mlp = Mlp::load(vb.pp("mlp"), cfg)?;
         let rms_1 = RmsNorm::new(cfg.hidden_size, cfg.rms_norm_eps, vb.pp("input_layernorm"))?;
         let rms_2 = RmsNorm::new(
             cfg.hidden_size,

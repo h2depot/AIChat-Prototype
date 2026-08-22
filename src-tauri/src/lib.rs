@@ -1,20 +1,17 @@
+#[path = "candle/generation.rs"]
+pub mod generation;
+#[path = "candle/granite.rs"]
+pub mod granite;
 mod llm;
-
-// Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
-#[tauri::command]
-fn greet(name: &str) -> String {
-    format!("Hello, {}! You've been greeted from Rust!", name)
-}
+#[path = "candle/tokenizer.rs"]
+pub mod tokenizer;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .manage(std::sync::Mutex::new(None::<llm::LlmPipeline>))
         .plugin(tauri_plugin_opener::init())
-        .invoke_handler(tauri::generate_handler![
-            greet,
-            llm::generate,
-            llm::initialize
-        ])
+        .invoke_handler(tauri::generate_handler![llm::generate, llm::initialize])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

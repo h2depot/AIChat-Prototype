@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
 import { GhostIconButton, GhostDropdown, GhostTextField, GhostToggle, GhostTooltip } from "../GhostDesignSystem";
+import { useLlmStore } from "../store/llm";
 import { Send, Bot, User, Sparkles, Sun, Moon, ArrowLeft } from "lucide-react";
 import "./tabview.css";
 
@@ -9,6 +10,13 @@ export default function TabView() {
     const [messages, setMessages] = useState([]);
     const [isDarkMode, setIsDarkMode] = useState(true);
     const messagesEndRef = useRef(null);
+    const initialize = useLlmStore((state) => state.initialize);
+    const initializing = useLlmStore((state) => state.initializing);
+    const initialized = useLlmStore((state) => state.initialized);
+    const generate = useLlmStore((state) => state.generate);
+    const generating = useLlmStore((state) => state.generating);
+    const error = useLlmStore((state) => state.error);
+    const clearError = useLlmStore((state) => state.clearError);
 
     const dropdownOptions = [
         { label: "rawtext1", value: "rawtext1" },
@@ -20,6 +28,10 @@ export default function TabView() {
         document.documentElement.setAttribute("data-theme", isDarkMode ? "dark" : "light");
     }, [isDarkMode]);
 
+    useEffect(() => {
+        initialize();
+    }, [initialize]);
+
     const scrollToBottom = () => {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
     };
@@ -28,24 +40,24 @@ export default function TabView() {
         scrollToBottom();
     }, [messages]);
 
-    const handleSend = () => {
+    const handleSend = async () => {
         const trimmed = inputText.trim();
-        if (!trimmed) return;
+        if (!trimmed || !initialized || generating) return;
 
-        // Add user message
+        clearError();
         const userMsg = { id: Date.now(), sender: "user", text: trimmed };
         setMessages((prev) => [...prev, userMsg]);
         setInputText("");
 
-        // Simulate AI response based on selectedOption
-        setTimeout(() => {
+        const response = await generate(trimmed);
+        if (response) {
             const aiMsg = {
                 id: Date.now() + 1,
                 sender: "ai",
-                text: `[${selectedOption}] 応答: 「${trimmed}」を受け取りました。`
+                text: response,
             };
             setMessages((prev) => [...prev, aiMsg]);
-        }, 600);
+        }
     };
 
     const handleKeyDown = (e) => {
@@ -102,7 +114,9 @@ export default function TabView() {
                     <div className="tab-view-hero">
                         <h1 className="tab-view-hero-title">このPCに住むGhostと会話する</h1>
                         <p className="tab-view-hero-subtitle">
-                            このPCは物語をより楽しむためのお手伝いをするGhostが住んでいます。物語に関する質問をしてみて！
+                            {initializing
+                                ? "言語モデルをイニシャライズ中...👻"
+                                : "このPCは物語をより楽しむためのお手伝いをするGhostが住んでいます。物語に関する質問をしてみて！"}
                         </p>
                     </div>
                 ) : (
@@ -135,6 +149,14 @@ export default function TabView() {
 
                 {/* Input Bar Area - Centered at Bottom with GhostTextField & GhostIconButton */}
                 <section className="tab-view-input-section">
+                    {error && (
+                        <div className="tab-view-error" role="alert">
+                            <span>{error}</span>
+                            <button type="button" onClick={clearError} aria-label="エラーを閉じる">
+                                ×
+                            </button>
+                        </div>
+                    )}
                     <div className="tab-view-input-bar">
                         <div style={{ flex: 1 }}>
                             <GhostTextField
@@ -150,7 +172,7 @@ export default function TabView() {
                                 onClick={handleSend}
                                 variant="primary"
                                 size="medium"
-                                disabled={!inputText.trim()}
+                                disabled={!inputText.trim() || !initialized || generating}
                             />
                         </GhostTooltip>
                     </div>

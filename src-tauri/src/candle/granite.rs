@@ -2,18 +2,17 @@
 //!
 //! A high performance transformer model optimized for efficient processing
 //! of very long context sequences
-//! 
+//!
 //! Excuse Me!!! This original code is from "https://github.com/huggingface/candle.git"
 //! I have modified it to fit my needs, but I want to give credit to the original authors for their work and contributions to the open-source community.
 //! Thank you very much!! by Helloween Head's Depot!
 
-use candle_core::{DType, Device, IndexOp, Module, Result, Tensor, D};
+use candle_core::{bail, DType, Device, IndexOp, Module, Result, Tensor, D};
 use candle_transformers::{
-    quantized_nn::{linear_no_bias as linear, Embedding,Linear, RmsNorm},
+    quantized_nn::{linear_no_bias as linear, Embedding, Linear, RmsNorm},
     quantized_var_builder::VarBuilder,
 };
 use std::{collections::HashMap, f32::consts::PI};
-
 
 #[derive(Debug, Clone, serde::Deserialize, Default)]
 pub enum GraniteRopeType {
@@ -90,6 +89,7 @@ pub struct Cache {
     cos: Tensor,
     sin: Tensor,
     device: Device,
+    max_position_embeddings: usize,
 }
 
 fn calculate_default_inv_freq(cfg: &Config) -> Vec<f32> {
@@ -149,15 +149,67 @@ impl Cache {
             device: device.clone(),
             cos,
             sin,
+            max_position_embeddings: config.max_position_embeddings,
         })
     }
 
-    fn mask(&mut self, seq_len: usize, index_pos: usize) -> Result<Tensor> {
-        let kv_len = index_pos + seq_len;
+    /// Clears all sequence-specific state so the cache can be reused.
+    pub fn clear(&mut self) {
+        self.kvs.iter_mut().for_each(|kv| *kv = None);
+        self.masks.clear();
+    }
+
+    /// Returns the number of tokens stored in every populated layer.
+    pub fn len(&self) -> Result<usize> {
+        let mut cache_len = None;
+        for (layer, kv) in self.kvs.iter().enumerate() {
+            let Some((k, v)) = kv else { continue };
+            let k_len = k.dim(2)?;
+            let v_len = v.dim(2)?;
+            if k_len != v_len {
+                bail!("invalid KV cache at layer {layer}: K has {k_len} tokens but V has {v_len}")
+            }
+            match cache_len {
+                Some(expected) if k_len != expected => bail!(
+                    "invalid KV cache at layer {layer}: expected {expected} tokens, got {k_len}"
+                ),
+                None => cache_len = Some(k_len),
+                _ => {}
+            }
+        }
+        Ok(cache_len.unwrap_or(0))
+    }
+
+    pub fn is_empty(&self) -> Result<bool> {
+        Ok(self.len()? == 0)
+    }
+
+    fn validate_forward(&self, index_pos: usize, seq_len: usize) -> Result<usize> {
+        let end_pos = index_pos
+            .checked_add(seq_len)
+            .ok_or_else(|| candle_core::Error::Msg("token position overflow".to_string()))?;
+        if end_pos > self.max_position_embeddings {
+            bail!(
+                "context length {end_pos} exceeds max_position_embeddings {}",
+                self.max_position_embeddings
+            )
+        }
+        let cache_len = self.len()?;
+        if self.use_kv_cache && cache_len != index_pos {
+            bail!(
+                "KV cache/index mismatch: cache contains {cache_len} tokens but index_pos is {index_pos}"
+            )
+        }
+        Ok(if self.use_kv_cache { cache_len } else { 0 })
+    }
+
+    fn mask(&mut self, seq_len: usize, past_len: usize) -> Result<Tensor> {
+        let kv_len = past_len + seq_len;
         if let Some(mask) = self.masks.get(&(seq_len, kv_len)) {
             Ok(mask.clone())
         } else {
-            let mask = candle_transformers::utils::build_causal_mask(seq_len, index_pos, &self.device)?;
+            let mask =
+                candle_transformers::utils::build_causal_mask(seq_len, past_len, &self.device)?;
             self.masks.insert((seq_len, kv_len), mask.clone());
             Ok(mask)
         }
@@ -281,9 +333,19 @@ impl CausalSelfAttention {
         candle_nn::rotary_emb::rope(x, &cos, &sin)
     }
     fn repeat_kv(&self, x: Tensor) -> Result<Tensor> {
-        candle_transformers::utils::repeat_kv(x, self.num_attention_heads / self.num_key_value_heads)
+        candle_transformers::utils::repeat_kv(
+            x,
+            self.num_attention_heads / self.num_key_value_heads,
+        )
     }
-    fn forward(&self, x: &Tensor, index_pos: usize, block_idx: usize, cache: &mut Cache,) -> Result<Tensor> {
+    fn forward(
+        &self,
+        x: &Tensor,
+        index_pos: usize,
+        block_idx: usize,
+        cache: &mut Cache,
+        past_len: usize,
+    ) -> Result<Tensor> {
         let _enter = self.span.enter();
         let (b_sz, seq_len, hidden_size) = x.dims3()?;
         let q = self.q_proj.forward(x)?;
@@ -309,26 +371,17 @@ impl CausalSelfAttention {
             if let Some((cache_k, cache_v)) = &cache.kvs[block_idx] {
                 k = Tensor::cat(&[cache_k, &k], 2)?.contiguous()?;
                 v = Tensor::cat(&[cache_v, &v], 2)?.contiguous()?;
-                let k_seq_len = k.dims()[1];
-                if k_seq_len > self.max_position_embeddings {
-                    k = k
-                        .narrow(
-                            D::Minus1,
-                            k_seq_len - self.max_position_embeddings,
-                            self.max_position_embeddings,
-                        )?
-                        .contiguous()?
-                }
-                let v_seq_len = v.dims()[1];
-                if v_seq_len > 2 * self.max_position_embeddings {
-                    v = v
-                        .narrow(
-                            D::Minus1,
-                            v_seq_len - self.max_position_embeddings,
-                            self.max_position_embeddings,
-                        )?
-                        .contiguous()?
-                }
+            }
+            let k_seq_len = k.dim(2)?;
+            let v_seq_len = v.dim(2)?;
+            if k_seq_len != v_seq_len {
+                bail!("K/V sequence length mismatch: K={k_seq_len}, V={v_seq_len}")
+            }
+            if k_seq_len > self.max_position_embeddings {
+                bail!(
+                    "KV cache length {k_seq_len} exceeds max_position_embeddings {}",
+                    self.max_position_embeddings
+                )
             }
             cache.kvs[block_idx] = Some((k.clone(), v.clone()))
         }
@@ -352,7 +405,7 @@ impl CausalSelfAttention {
             let att = if seq_len == 1 {
                 att
             } else {
-                let mask = cache.mask(seq_len, index_pos)?.broadcast_as(att.shape())?;
+                let mask = cache.mask(seq_len, past_len)?.broadcast_as(att.shape())?;
                 Self::masked_fill(&att, &mask, f32::NEG_INFINITY)?
             };
             let att = candle_nn::ops::softmax(&att, D::Minus1)?;
@@ -386,7 +439,7 @@ impl CausalSelfAttention {
             span,
             span_rot,
             max_position_embeddings: cfg.max_position_embeddings,
-            attention_multiplier:  cfg.attention_multiplier,
+            attention_multiplier: cfg.attention_multiplier,
         })
     }
 }
@@ -399,13 +452,13 @@ struct Mlp {
     span: tracing::Span,
 }
 impl Mlp {
-    fn forward(&self, x: &Tensor) -> Result<Tensor>{
+    fn forward(&self, x: &Tensor) -> Result<Tensor> {
         let _enter = self.span.enter();
         let x = (candle_nn::ops::silu(&self.c_fc1.forward(x)?)? * self.c_fc2.forward(x)?)?;
         self.c_proj.forward(&x)
     }
 
-    fn load(vb: VarBuilder, cfg: &Config) -> Result<Self>{
+    fn load(vb: VarBuilder, cfg: &Config) -> Result<Self> {
         let span = tracing::span!(tracing::Level::TRACE, "mlp");
         let h_size = cfg.hidden_size;
         let i_size = cfg.intermediate_size;
@@ -431,24 +484,36 @@ struct Block {
     residual_multiplier: f32,
 }
 impl Block {
-    fn forward(&self, x: &Tensor, index_pos: usize, block_idx: usize, cache: &mut Cache,) -> Result<Tensor> {
+    fn forward(
+        &self,
+        x: &Tensor,
+        index_pos: usize,
+        block_idx: usize,
+        cache: &mut Cache,
+        past_len: usize,
+    ) -> Result<Tensor> {
         let _enter = self.span.enter();
         let residual = x;
         let x = self.rms_1.forward(x)?;
-        let x = ((self.attn.forward(&x, index_pos, block_idx, cache)? * self.residual_multiplier as f64)? + residual)?;
+        let x = ((self
+            .attn
+            .forward(&x, index_pos, block_idx, cache, past_len)?
+            * self.residual_multiplier as f64)?
+            + residual)?;
         let residual = &x;
-        let x = ((self.mlp.forward(&self.rms_2.forward(&x)?)? * self.residual_multiplier as f64)? + residual)?;
+        let x = ((self.mlp.forward(&self.rms_2.forward(&x)?)? * self.residual_multiplier as f64)?
+            + residual)?;
         Ok(x)
     }
 
     fn load(vb: VarBuilder, cfg: &Config) -> Result<Self> {
         let span = tracing::span!(tracing::Level::TRACE, "blk");
-        let attn = CausalSelfAttention::load(vb.clone(),cfg)?;
+        let attn = CausalSelfAttention::load(vb.clone(), cfg)?;
         let mlp = Mlp::load(vb.clone(), cfg)?;
         let rms_1 = RmsNorm::new(cfg.hidden_size, cfg.rms_norm_eps, vb.pp("attn_norm"))?;
-        let rms_2 = RmsNorm::new(cfg.hidden_size,cfg.rms_norm_eps,vb.pp("ffn_norm"))?;
+        let rms_2 = RmsNorm::new(cfg.hidden_size, cfg.rms_norm_eps, vb.pp("ffn_norm"))?;
 
-        Ok(Self{
+        Ok(Self {
             rms_1,
             attn,
             rms_2,
@@ -469,18 +534,22 @@ pub struct Granite {
     logits_scaling: f32,
 }
 
-impl Granite{
+impl Granite {
     pub fn forward(&self, x: &Tensor, index_pos: usize, cache: &mut Cache) -> Result<Tensor> {
         let (_b_sz, seq_len) = x.dims2()?;
+        if seq_len == 0 {
+            bail!("cannot run Granite with an empty token sequence")
+        }
+        let past_len = cache.validate_forward(index_pos, seq_len)?;
         let mut x = self.wte.forward(x)?;
         x = (x * self.embedding_multiplier as f64)?;
         for (block_idx, block) in self.blocks.iter().enumerate() {
-            x = block.forward(&x, index_pos, block_idx, cache)?;
+            x = block.forward(&x, index_pos, block_idx, cache, past_len)?;
         }
         let x = self.ln_f.forward(&x)?;
         let x = x.i((.., seq_len - 1, ..))?.contiguous()?;
         let logits = self.lm_head.forward(&x)?;
-        (logits.to_dtype(DType::F32)? / self.logits_scaling as f64)
+        logits.to_dtype(DType::F32)? / self.logits_scaling as f64
     }
 
     pub fn load(vb: VarBuilder, cfg: &Config) -> Result<Self> {
@@ -490,7 +559,7 @@ impl Granite{
             .map(|i| Block::load(vb.pp(format!("blk.{i}")), cfg))
             .collect::<Result<_>>()?;
         let lm_head = linear(cfg.hidden_size, cfg.vocab_size, vb.pp("token_embd"))?;
-        Ok(Self{
+        Ok(Self {
             wte,
             blocks,
             ln_f,
@@ -498,5 +567,181 @@ impl Granite{
             embedding_multiplier: cfg.embedding_multiplier,
             logits_scaling: cfg.logits_scaling,
         })
+    }
+
+    #[cfg(test)]
+    pub(crate) fn forward_hidden_trace(
+        &self,
+        input: &Tensor,
+        index_pos: usize,
+        cache: &mut Cache,
+    ) -> Result<Vec<Tensor>> {
+        let (_batch_size, seq_len) = input.dims2()?;
+        let past_len = cache.validate_forward(index_pos, seq_len)?;
+        let mut hidden = (self.wte.forward(input)? * self.embedding_multiplier as f64)?;
+        let mut trace = vec![hidden.i((.., seq_len - 1, ..))?.contiguous()?];
+
+        for (block_idx, block) in self.blocks.iter().enumerate() {
+            hidden = block.forward(&hidden, index_pos, block_idx, cache, past_len)?;
+            trace.push(hidden.i((.., seq_len - 1, ..))?.contiguous()?);
+        }
+        trace.push(
+            self.ln_f
+                .forward(&hidden)?
+                .i((.., seq_len - 1, ..))?
+                .contiguous()?,
+        );
+        Ok(trace)
+    }
+
+    #[cfg(test)]
+    pub(crate) fn forward_first_block_trace(
+        &self,
+        input: &Tensor,
+        index_pos: usize,
+        cache: &mut Cache,
+    ) -> Result<Vec<(&'static str, Tensor)>> {
+        let (_batch_size, seq_len) = input.dims2()?;
+        let past_len = cache.validate_forward(index_pos, seq_len)?;
+        let block = &self.blocks[0];
+        let hidden = (self.wte.forward(input)? * self.embedding_multiplier as f64)?;
+        let normalized = block.rms_1.forward(&hidden)?;
+
+        let q_raw = block.attn.q_proj.forward(&normalized)?;
+        let k_raw = block.attn.k_proj.forward(&normalized)?;
+        let v_raw = block.attn.v_proj.forward(&normalized)?;
+        let (batch_size, _, _hidden_size) = normalized.dims3()?;
+        let q = q_raw
+            .reshape((
+                batch_size,
+                seq_len,
+                block.attn.num_attention_heads,
+                block.attn.head_dim,
+            ))?
+            .transpose(1, 2)?
+            .contiguous()?;
+        let k = k_raw
+            .reshape((
+                batch_size,
+                seq_len,
+                block.attn.num_key_value_heads,
+                block.attn.head_dim,
+            ))?
+            .transpose(1, 2)?
+            .contiguous()?;
+        let q_rope = block.attn.apply_rotary_emb(&q, index_pos, cache)?;
+        let k_rope = block.attn.apply_rotary_emb(&k, index_pos, cache)?;
+        let attention = block
+            .attn
+            .forward(&normalized, index_pos, 0, cache, past_len)?;
+        let after_attention = ((&attention * block.residual_multiplier as f64)? + &hidden)?;
+        let mlp_input = block.rms_2.forward(&after_attention)?;
+        let mlp_output = block.mlp.forward(&mlp_input)?;
+        let block_output = ((&mlp_output * block.residual_multiplier as f64)? + &after_attention)?;
+
+        let last_seq = |tensor: &Tensor| tensor.i((.., seq_len - 1, ..))?.contiguous();
+        let last_heads = |tensor: &Tensor| {
+            tensor
+                .i((.., .., seq_len - 1, ..))?
+                .contiguous()?
+                .reshape((batch_size, tensor.dim(1)? * block.attn.head_dim))
+        };
+
+        Ok(vec![
+            ("embedding", last_seq(&hidden)?),
+            ("rms_1", last_seq(&normalized)?),
+            ("q_projection", last_seq(&q_raw)?),
+            ("k_projection", last_seq(&k_raw)?),
+            ("v_projection", last_seq(&v_raw)?),
+            ("q_rope", last_heads(&q_rope)?),
+            ("k_rope", last_heads(&k_rope)?),
+            ("attention_output", last_seq(&attention)?),
+            ("after_attention_residual", last_seq(&after_attention)?),
+            ("rms_2", last_seq(&mlp_input)?),
+            ("mlp_output", last_seq(&mlp_output)?),
+            ("block_output", last_seq(&block_output)?),
+        ])
+    }
+
+    #[cfg(test)]
+    pub(crate) fn first_block_projection_shape_diffs(
+        &self,
+        token_id: u32,
+        repeats: usize,
+        device: &Device,
+    ) -> Result<Vec<(&'static str, f32)>> {
+        let input = Tensor::new(&[token_id], device)?.unsqueeze(0)?;
+        let hidden = (self.wte.forward(&input)? * self.embedding_multiplier as f64)?;
+        let normalized = self.blocks[0].rms_1.forward(&hidden)?;
+        let repeated = Tensor::cat(&vec![&normalized; repeats], 1)?;
+        let block = &self.blocks[0];
+
+        let compare = |projection: &Linear| -> Result<f32> {
+            let single = projection.forward(&normalized)?;
+            let batched = projection.forward(&repeated)?;
+            let batched_last = batched.i((.., repeats - 1, ..))?.unsqueeze(1)?;
+            (&single - &batched_last)?
+                .abs()?
+                .max_all()?
+                .to_scalar::<f32>()
+        };
+
+        Ok(vec![
+            ("q_projection", compare(&block.attn.q_proj)?),
+            ("k_projection", compare(&block.attn.k_proj)?),
+            ("v_projection", compare(&block.attn.v_proj)?),
+            ("o_projection", compare(&block.attn.o_proj)?),
+            ("mlp_gate", compare(&block.mlp.c_fc1)?),
+            ("mlp_up", compare(&block.mlp.c_fc2)?),
+        ])
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn cache_with_kv(
+        k_shape: (usize, usize, usize, usize),
+        v_shape: (usize, usize, usize, usize),
+    ) -> Cache {
+        let device = Device::Cpu;
+        Cache {
+            masks: HashMap::new(),
+            use_kv_cache: true,
+            kvs: vec![Some((
+                Tensor::zeros(k_shape, DType::F32, &device).unwrap(),
+                Tensor::zeros(v_shape, DType::F32, &device).unwrap(),
+            ))],
+            cos: Tensor::zeros((16, 2), DType::F32, &device).unwrap(),
+            sin: Tensor::zeros((16, 2), DType::F32, &device).unwrap(),
+            device,
+            max_position_embeddings: 16,
+        }
+    }
+
+    #[test]
+    fn cache_len_uses_the_sequence_axis() {
+        let cache = cache_with_kv((1, 2, 7, 4), (1, 2, 7, 4));
+        assert_eq!(cache.len().unwrap(), 7);
+    }
+
+    #[test]
+    fn cache_rejects_different_k_and_v_lengths() {
+        let cache = cache_with_kv((1, 2, 7, 4), (1, 2, 6, 4));
+        assert!(cache.len().is_err());
+    }
+
+    #[test]
+    fn forward_position_must_match_cache_length() {
+        let cache = cache_with_kv((1, 2, 7, 4), (1, 2, 7, 4));
+        assert!(cache.validate_forward(6, 1).is_err());
+        assert_eq!(cache.validate_forward(7, 1).unwrap(), 7);
+    }
+
+    #[test]
+    fn forward_rejects_positions_past_rope_table() {
+        let cache = cache_with_kv((1, 2, 15, 4), (1, 2, 15, 4));
+        assert!(cache.validate_forward(15, 2).is_err());
     }
 }
