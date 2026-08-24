@@ -52,6 +52,9 @@ export const useLlmStore = create((set, get) => ({
     }
   },
 
-  clearMessages: () => set({ messages: [], error: null }),
+  clearMessages: async () => {
+    await invoke("clear_chat");
+    set({ messages: [], error: null });
+  },
   clearError: () => set({ error: null }),
 }));

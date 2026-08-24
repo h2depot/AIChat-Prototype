@@ -17,6 +17,7 @@ export default function TabView() {
     const generating = useLlmStore((state) => state.generating);
     const error = useLlmStore((state) => state.error);
     const clearError = useLlmStore((state) => state.clearError);
+    const clearMessages = useLlmStore((state) => state.clearMessages);
 
     const dropdownOptions = [
         { label: "rawtext1", value: "rawtext1" },
@@ -67,7 +68,8 @@ export default function TabView() {
         }
     };
 
-    const handleReset = () => {
+    const handleReset = async () => {
+        await clearMessages();
         setMessages([]);
         setInputText("");
     };

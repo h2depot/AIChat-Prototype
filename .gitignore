@@ -8,6 +8,9 @@ pnpm-debug.log*
 lerna-debug.log*
 
 node_modules
+/llm_server/.venv/
+/llm_server/.uv-cache/
+/.npm-cache/
 dist
 dist-ssr
 *.local
