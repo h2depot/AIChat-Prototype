@@ -1,0 +1,14 @@
+Python側（PowerShellの別ターミナルで実行）
+Python server: run the commands below in a separate PowerShell terminal.
+
+cd C:\Atelier\Develop\AIChat-Prototype\llm_server
+uv run uvicorn src.api_server:app --host 127.0.0.1 --port 8000
+
+Tauri側（PowerShellの別ターミナルで実行）
+Tauri app: run the commands below in another PowerShell terminal.
+
+cd C:\Atelier\Develop\AIChat-Prototype
+npm run tauri dev
+
+※モデル駆動中は常にタスクマネージャーを開き、GPUが作動していることをチェックすること。
+(Keep Task Manager open while the model is running and check that the GPU is active.)

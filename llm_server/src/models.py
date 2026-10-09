@@ -1,6 +1,5 @@
 import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
-import bitsandbytes as bnb
 import accelerate
 
 MODEL_ID = "ibm-granite/granite-4.1-3b"

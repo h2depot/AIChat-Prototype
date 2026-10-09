@@ -5,7 +5,7 @@ import { Send, Bot, User, Sparkles, Sun, Moon, ArrowLeft } from "lucide-react";
 import "./tabview.css";
 
 export default function TabView() {
-    const [selectedOption, setSelectedOption] = useState("rawtext1");
+    const [selectedOption, setSelectedOption] = useState("none");
     const [inputText, setInputText] = useState("");
     const [messages, setMessages] = useState([]);
     const [isDarkMode, setIsDarkMode] = useState(true);
@@ -20,10 +20,32 @@ export default function TabView() {
     const clearMessages = useLlmStore((state) => state.clearMessages);
 
     const dropdownOptions = [
-        { label: "rawtext1", value: "rawtext1" },
-        { label: "rawtext2", value: "rawtext2" },
-        { label: "rawtext3", value: "rawtext3" },
+        { label: "テンプレートなし", value: "none", prompt: "" },
+        {
+            label: "わかりやすく解説",
+            value: "explain",
+            prompt: "機械学習を身近な例で簡単に説明して。",
+        },
+        {
+            label: "アイデアを出す",
+            value: "ideas",
+            prompt: "紙とペンで一人で遊べるアイデアを5つ教えて。",
+        },
+        {
+            label: "文章を整える",
+            value: "rewrite",
+            prompt: "「もう少し説明してほしいです」を丁寧に言い換えて。",
+        },
+        { label: "違いを比べる", value: "compare", prompt: "メモと日記の違いを簡単に教えて。" },
+        { label: "英語に翻訳", value: "translate", prompt: "「手伝ってくれてありがとう」を自然な英語にして。" },
     ];
+
+    const handleTemplateSelect = (value) => {
+        const template = dropdownOptions.find((option) => option.value === value);
+        if (!template) return;
+        setSelectedOption(value);
+        setInputText(template.prompt);
+    };
 
     useEffect(() => {
         document.documentElement.setAttribute("data-theme", isDarkMode ? "dark" : "light");
@@ -79,7 +101,7 @@ export default function TabView() {
             {/* Top Header */}
             <header className="tab-view-header">
                 <div className="tab-view-header-title">
-                    <span>Ghost Librarian</span>
+                    <span>Local Model Chat</span>
                 </div>
                 <div className="tab-view-header-right">
                     <GhostTooltip content={isDarkMode ? "夜モード" : "昼モード"} position="bottom">
@@ -104,8 +126,8 @@ export default function TabView() {
                     <GhostDropdown
                         options={dropdownOptions}
                         value={selectedOption}
-                        onChange={(val) => setSelectedOption(val)}
-                        placeholder="Select Mode"
+                        onChange={handleTemplateSelect}
+                        placeholder="質問テンプレート"
                     />
                 </div>
             </header>
@@ -114,11 +136,11 @@ export default function TabView() {
             <main className="tab-view-main">
                 {messages.length === 0 ? (
                     <div className="tab-view-hero">
-                        <h1 className="tab-view-hero-title">このPCに住むGhostと会話する</h1>
+                        <h1 className="tab-view-hero-title">このPCのローカルモデルと会話する</h1>
                         <p className="tab-view-hero-subtitle">
                             {initializing
                                 ? "言語モデルをイニシャライズ中...👻"
-                                : "このPCは物語をより楽しむためのお手伝いをするGhostが住んでいます。物語に関する質問をしてみて！"}
+                                : "このPCのローカルモデルに質問してみて！"}
                         </p>
                     </div>
                 ) : (
@@ -165,7 +187,7 @@ export default function TabView() {
                                 value={inputText}
                                 onChange={(e) => setInputText(e.target.value)}
                                 onKeyDown={handleKeyDown}
-                                placeholder="この物語について聞きたいことはあるかな？"
+                                placeholder="聞きたいことを入力してね"
                             />
                         </div>
                         <GhostTooltip content="送信" position="top">
@@ -179,7 +201,7 @@ export default function TabView() {
                         </GhostTooltip>
                     </div>
                     <span className="tab-view-disclaimer">
-                        {selectedOption}について話そう！ | AIモデルからの回答は間違っている可能性があります…ゴメンネ💦
+                        AIモデルからの回答は間違っている可能性があります…ゴメンネ💦
                     </span>
                 </section>
             </main>
